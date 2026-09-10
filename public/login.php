@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/auth.php';
 
 $user = current_user();
 if (!empty($user['id'])) {
-    header('Location: /parking-system/public/dashboard.php');
+    header('Location: ' . BASE_URL . '/public/dashboard.php');
     exit;
 }
 
@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($row && password_verify($password, $row['password_hash'])) {
             login_user($row);
-            header('Location: /parking-system/public/dashboard.php');
+            header('Location: ' . BASE_URL . '/public/dashboard.php');
             exit;
         } else {
             $error_banner = $fail_msg;
@@ -46,7 +46,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="auth-form-side">
 
             <div class="auth-brand-badge">
-                <img src="/parking-system/assets/images/logo.jpg" alt="CampusPark" style="width:20px;height:20px;border-radius:5px;object-fit:cover;" />
+                <img src="<?= BASE_URL ?>/assets/images/logo.jpg" alt="CampusPark" style="width:20px;height:20px;border-radius:5px;object-fit:cover;" />
                 CampusPark Mobility
             </div>
 
@@ -101,14 +101,14 @@ require_once __DIR__ . '/../includes/header.php';
 
             <p class="auth-switch-link">
                 Don't have an account?
-                <a href="/parking-system/public/signup.php">Sign up for free</a>
+                <a href="<?= BASE_URL ?>/public/signup.php">Sign up for free</a>
             </p>
 
         </div>
 
         <!-- Right Preview / Showcase Side (Inspiration from Image 1 & 2) -->
         <div class="auth-preview-side">
-            <img src="/parking-system/assets/images/hero-aerial-ev.jpg"
+            <img src="<?= BASE_URL ?>/assets/images/hero-aerial-ev.jpg"
                  alt="Smart campus vehicle navigation visual"
                  class="auth-preview-bg">
             <div class="auth-preview-overlay"></div>

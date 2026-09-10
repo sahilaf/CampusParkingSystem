@@ -56,22 +56,85 @@ function initBookingModal() {
     if (!overlay) return;
 
     // Hidden form inputs populated when a slot is selected
-    const inputSlotId   = document.getElementById('inputSlotId');
-    const inputSlotCode = document.getElementById('inputSlotCode');
+    const inputSlotId        = document.getElementById('inputSlotId');
+    const inputSlotCode      = document.getElementById('inputSlotCode');
+    const inputDurationHours = document.getElementById('inputDurationHours');
 
     // Modal display fields
-    const modalSlotCode = document.getElementById('modalSlotCode');
-    const modalZone     = document.getElementById('modalZone');
-    const modalDate     = document.getElementById('modalDate');
+    const modalSlotCode         = document.getElementById('modalSlotCode');
+    const modalZone             = document.getElementById('modalZone');
+    const modalDate             = document.getElementById('modalDate');
+    const durationSelect        = document.getElementById('durationSelect');
+    const modalPointCost        = document.getElementById('modalPointCost');
+    const modalUserBalance      = document.getElementById('modalUserBalance');
+    const modalRemainingBalance = document.getElementById('modalRemainingBalance');
+    const modalPointsWarning    = document.getElementById('modalPointsWarning');
+    const modalWarningCost      = document.getElementById('modalWarningCost');
+    const modalSubmitBtn        = document.getElementById('modalSubmitBtn');
+
+    const userPoints = parseInt(overlay.dataset.userPoints, 10) || 0;
+
+    function updateDurationCalculations() {
+        const hours = durationSelect ? parseInt(durationSelect.value, 10) || 1 : 1;
+        const cost = hours * 10;
+        const remaining = userPoints - cost;
+
+        if (inputDurationHours) {
+            inputDurationHours.value = hours;
+        }
+        if (modalPointCost) {
+            modalPointCost.textContent = cost + ' points';
+        }
+        if (modalUserBalance) {
+            modalUserBalance.textContent = userPoints + ' points';
+        }
+
+        if (remaining < 0) {
+            if (modalRemainingBalance) {
+                modalRemainingBalance.textContent = 'Insufficient (' + cost + ' needed)';
+                modalRemainingBalance.style.color = 'var(--clr-error)';
+            }
+            if (modalPointsWarning) {
+                modalPointsWarning.style.display = 'flex';
+                if (modalWarningCost) modalWarningCost.textContent = cost;
+            }
+            if (modalSubmitBtn) {
+                modalSubmitBtn.disabled = true;
+                modalSubmitBtn.style.opacity = '0.5';
+                modalSubmitBtn.style.cursor = 'not-allowed';
+            }
+        } else {
+            if (modalRemainingBalance) {
+                modalRemainingBalance.textContent = remaining + ' points';
+                modalRemainingBalance.style.color = 'var(--clr-success)';
+            }
+            if (modalPointsWarning) {
+                modalPointsWarning.style.display = 'none';
+            }
+            if (modalSubmitBtn) {
+                modalSubmitBtn.disabled = false;
+                modalSubmitBtn.style.opacity = '1';
+                modalSubmitBtn.style.cursor = 'pointer';
+            }
+        }
+    }
+
+    if (durationSelect) {
+        durationSelect.addEventListener('change', updateDurationCalculations);
+    }
 
     function openModal(card) {
-        inputSlotId.value   = card.dataset.slotId;
-        inputSlotCode.value = card.dataset.slotCode;
-        modalSlotCode.textContent = card.dataset.slotCode;
-        modalZone.textContent     = card.dataset.zone;
+        if (inputSlotId) inputSlotId.value   = card.dataset.slotId;
+        if (inputSlotCode) inputSlotCode.value = card.dataset.slotCode;
+        if (modalSlotCode) modalSlotCode.textContent = card.dataset.slotCode;
+        if (modalZone) modalZone.textContent     = card.dataset.zone;
         // Reflect the currently selected date from the date picker
         const datePicker = document.getElementById('bookingDate');
-        modalDate.textContent = datePicker ? formatDate(datePicker.value) : '—';
+        if (modalDate) modalDate.textContent = datePicker ? formatDate(datePicker.value) : '—';
+
+        if (durationSelect) durationSelect.value = '1';
+        updateDurationCalculations();
+
         overlay.classList.add('is-open');
         overlay.setAttribute('aria-hidden', 'false');
         closeBtn.focus();
@@ -476,7 +539,7 @@ function initCampusMap() {
                     <span class="material-symbols-outlined" style="font-size:15px; color:${zone.color};">directions_walk</span>
                     <span>${zone.walkTime}</span>
                 </div>
-                <a href="/parking-system/public/book-slot.php" class="campus-map-popup-btn">
+                <a href="${window.location.pathname.includes('/public/') ? 'book-slot.php' : 'public/book-slot.php'}" class="campus-map-popup-btn">
                     <span>Reserve in Zone ${zone.id}</span>
                     <span class="material-symbols-outlined" style="font-size:16px;">arrow_forward</span>
                 </a>

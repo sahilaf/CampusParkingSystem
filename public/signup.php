@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/auth.php';
 
 $user = current_user();
 if (!empty($user['id'])) {
-    header('Location: /parking-system/public/dashboard.php');
+    header('Location: ' . BASE_URL . '/public/dashboard.php');
     exit;
 }
 
@@ -44,15 +44,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($errors)) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)');
-        $stmt->execute([$full_name, $email, $hash, 'user']);
+        $stmt = $pdo->prepare('INSERT INTO users (full_name, email, password_hash, role, reward_points, package_tier) VALUES (?, ?, ?, ?, 100, ?)');
+        $stmt->execute([$full_name, $email, $hash, 'user', 'Starter']);
         $new_id = (int) $pdo->lastInsertId();
+
+        // Record initial 100 reward points in transaction history
+        try {
+            $stmtTx = $pdo->prepare("INSERT INTO point_transactions (user_id, type, points, description) VALUES (?, 'signup_bonus', 100, 'Welcome bonus reward points')");
+            $stmtTx->execute([$new_id]);
+        } catch (Throwable $ignore) {}
 
         $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
         $stmt->execute([$new_id]);
         login_user($stmt->fetch());
 
-        header('Location: /parking-system/public/dashboard.php');
+        $_SESSION['flash'] = 'Welcome to CampusPark! You have received 100 bonus points to book parking slots.';
+
+        header('Location: ' . BASE_URL . '/public/dashboard.php');
         exit;
     }
 }
@@ -69,7 +77,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="auth-form-side">
 
             <div class="auth-brand-badge">
-                <img src="/parking-system/assets/images/logo.jpg" alt="CampusPark" style="width:20px;height:20px;border-radius:5px;object-fit:cover;" />
+                <img src="<?= BASE_URL ?>/assets/images/logo.jpg" alt="CampusPark" style="width:20px;height:20px;border-radius:5px;object-fit:cover;" />
                 CampusPark Mobility
             </div>
 
@@ -157,14 +165,14 @@ require_once __DIR__ . '/../includes/header.php';
 
             <p class="auth-switch-link">
                 Already have an account?
-                <a href="/parking-system/public/login.php">Log in</a>
+                <a href="<?= BASE_URL ?>/public/login.php">Log in</a>
             </p>
 
         </div>
 
         <!-- Right Preview / Showcase Side (Inspiration from Image 1 & 2) -->
         <div class="auth-preview-side">
-            <img src="/parking-system/assets/images/hero-aerial-ev.jpg"
+            <img src="<?= BASE_URL ?>/assets/images/hero-aerial-ev.jpg"
                  alt="Smart campus vehicle navigation visual"
                  class="auth-preview-bg">
             <div class="auth-preview-overlay"></div>
@@ -201,7 +209,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </li>
                         <li class="auth-preview-feature-item">
                             <span class="auth-preview-feature-check">✓</span>
-                            <span>Student permit rates automatically applied</span>
+                            <span>100 free bonus parking points on registration</span>
                         </li>
                         <li class="auth-preview-feature-item">
                             <span class="auth-preview-feature-check">✓</span>

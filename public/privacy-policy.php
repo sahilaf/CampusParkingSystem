@@ -204,7 +204,7 @@ require_once __DIR__ . '/../includes/header.php';
 
     <!-- Back link -->
     <div class="mt-10">
-        <a href="/parking-system/public/index.php"
+        <a href="<?= BASE_URL ?>/public/index.php"
            style="display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:600; color:var(--clr-primary, #0891B2); text-decoration:none;">
             <span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span>
             Back to Home

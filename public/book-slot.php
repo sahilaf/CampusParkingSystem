@@ -5,14 +5,29 @@ require_login();
 
 $user      = current_user();
 $is_locked = is_booking_locked();
+$user_points = refresh_user_points($pdo, $user['id']);
+
+// Automatically redirect to payment packages page if rewards/points are exhausted (< 10 points)
+if ($user_points < 10) {
+    header('Location: ' . BASE_URL . '/public/payment.php?reason=insufficient_points&return_to=book-slot');
+    exit;
+}
 
 $form_error = '';
 
 // ---------- POST — process booking ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_locked) {
 
-    $slot_id      = (int) ($_POST['slot_id']   ?? 0);
-    $booking_date = trim($_POST['booking_date'] ?? '');
+    $slot_id        = (int) ($_POST['slot_id']        ?? 0);
+    $booking_date   = trim($_POST['booking_date']     ?? '');
+    $duration_hours = max(1, min(24, (int) ($_POST['duration_hours'] ?? 1)));
+    $points_cost    = $duration_hours * 10;
+
+    // Verify user has sufficient points
+    if ($user_points < $points_cost) {
+        header('Location: ' . BASE_URL . '/public/payment.php?reason=insufficient_points&return_to=book-slot');
+        exit;
+    }
 
     $valid_slot = false;
     if ($slot_id > 0) {
@@ -51,13 +66,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_locked) {
     }
 
     if ($form_error === '') {
-        $stmt = $pdo->prepare('INSERT INTO bookings (user_id, slot_id, booking_date, status) VALUES (?, ?, ?, ?)');
-        $stmt->execute([$user['id'], $slot_id, $booking_date, 'booked']);
+        // Atomic points deduction: ensure user still has enough points
+        $stmtDeduct = $pdo->prepare('UPDATE users SET reward_points = reward_points - ? WHERE id = ? AND reward_points >= ?');
+        $stmtDeduct->execute([$points_cost, $user['id'], $points_cost]);
+
+        if ($stmtDeduct->rowCount() === 0) {
+            header('Location: ' . BASE_URL . '/public/payment.php?reason=insufficient_points&return_to=book-slot');
+            exit;
+        }
+
+        $stmt = $pdo->prepare('INSERT INTO bookings (user_id, slot_id, booking_date, duration_hours, points_cost, status) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$user['id'], $slot_id, $booking_date, $duration_hours, $points_cost, 'booked']);
+
+        // Record point transaction
+        try {
+            $stmtTx = $pdo->prepare("INSERT INTO point_transactions (user_id, type, points, description) VALUES (?, 'booking_deduction', ?, ?)");
+            $stmtTx->execute([$user['id'], -$points_cost, "Slot {$valid_slot['slot_code']} reservation ({$duration_hours} hr" . ($duration_hours > 1 ? 's' : '') . ")"]);
+        } catch (Throwable $ignore) {}
+
+        refresh_user_points($pdo, $user['id']);
 
         $_SESSION['flash'] = "Slot {$valid_slot['slot_code']} booked for "
-            . date('M j, Y', strtotime($booking_date)) . '!';
+            . date('M j, Y', strtotime($booking_date)) . " ({$duration_hours} hr" . ($duration_hours > 1 ? 's' : '') . " • {$points_cost} points used)!";
 
-        header('Location: /parking-system/public/dashboard.php');
+        header('Location: ' . BASE_URL . '/public/dashboard.php');
         exit;
     }
 }
@@ -119,10 +151,34 @@ require_once __DIR__ . '/../includes/header.php';
             <h1 class="page-title">Reserve a Parking Slot</h1>
             <p class="page-subtitle">Select a date, then click an available slot to confirm.</p>
         </div>
-        <a href="/parking-system/public/dashboard.php" class="btn btn-outline flex items-center gap-sm">
+        <a href="<?= BASE_URL ?>/public/dashboard.php" class="btn btn-outline flex items-center gap-sm">
             <span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span>
             Dashboard
         </a>
+    </div>
+
+    <!-- Points & Hourly Rate Strip -->
+    <div class="book-slot-rate-strip mb-lg">
+        <div class="flex items-center justify-between flex-wrap gap-md">
+            <div class="flex items-center gap-sm">
+                <span class="material-symbols-outlined" style="color:var(--clr-secondary); font-size:28px;">toll</span>
+                <div>
+                    <span style="font-size:12px; color:var(--clr-text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Your Points Balance</span>
+                    <div style="font-size:20px; font-weight:800; color:var(--clr-text);">
+                        <?= $user_points ?> <span style="font-size:14px; font-weight:600; color:var(--clr-text-muted);">Points available</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-md flex-wrap">
+                <div class="badge" style="background:rgba(8,145,178,0.12); color:var(--clr-secondary); font-weight:700; font-size:13px; padding:6px 14px; border:1px solid var(--clr-border-violet); border-radius:9999px;">
+                    🅿️ Rate: 10 points / hour
+                </div>
+                <a href="<?= BASE_URL ?>/public/payment.php?return_to=book-slot" class="btn btn-outline flex items-center gap-xs" style="padding:8px 14px; font-size:13px; font-weight:600;">
+                    <span class="material-symbols-outlined" style="font-size:16px;">add_card</span>
+                    Recharge Points
+                </a>
+            </div>
+        </div>
     </div>
 
     <!-- Date filter controls -->
@@ -215,6 +271,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 <!-- Booking confirmation modal -->
 <div id="bookingModal" class="modal-overlay"
+     data-user-points="<?= $user_points ?>"
      role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
 
     <div class="modal-panel">
@@ -229,7 +286,7 @@ require_once __DIR__ . '/../includes/header.php';
         <ul class="modal-detail-list" aria-label="Booking details">
             <li class="modal-detail-item">
                 <span class="modal-detail-label">Slot</span>
-                <span class="modal-detail-value" id="modalSlotCode">—</span>
+                <span class="modal-detail-value font-bold" id="modalSlotCode">—</span>
             </li>
             <li class="modal-detail-item">
                 <span class="modal-detail-label">Zone</span>
@@ -239,6 +296,42 @@ require_once __DIR__ . '/../includes/header.php';
                 <span class="modal-detail-label">Date</span>
                 <span class="modal-detail-value" id="modalDate">—</span>
             </li>
+
+            <!-- Duration Selector -->
+            <li class="modal-detail-item" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                <label for="durationSelect" class="modal-detail-label" style="font-weight:700; color:var(--clr-text);">
+                    Duration (10 pts / hour)
+                </label>
+                <select id="durationSelect" class="form-input" style="width:100%; font-weight:600; padding:8px 12px; border-radius:8px;">
+                    <option value="1" selected>1 Hour — 10 Points</option>
+                    <option value="2">2 Hours — 20 Points</option>
+                    <option value="3">3 Hours — 30 Points</option>
+                    <option value="4">4 Hours — 40 Points</option>
+                    <option value="5">5 Hours — 50 Points</option>
+                    <option value="8">8 Hours — 80 Points</option>
+                </select>
+            </li>
+
+            <!-- Points Cost Breakdown -->
+            <li class="modal-detail-item">
+                <span class="modal-detail-label">Total Points Cost</span>
+                <span class="modal-detail-value" id="modalPointCost" style="color:var(--clr-secondary); font-weight:800; font-size:16px;">
+                    10 points
+                </span>
+            </li>
+            <li class="modal-detail-item">
+                <span class="modal-detail-label">Your Points Balance</span>
+                <span class="modal-detail-value" id="modalUserBalance" style="font-weight:600;">
+                    <?= $user_points ?> points
+                </span>
+            </li>
+            <li class="modal-detail-item">
+                <span class="modal-detail-label">Remaining Balance</span>
+                <span class="modal-detail-value font-bold" id="modalRemainingBalance" style="color:var(--clr-success);">
+                    <?= max(0, $user_points - 10) ?> points
+                </span>
+            </li>
+
             <div class="modal-divider"></div>
             <li class="modal-detail-item">
                 <span class="modal-detail-label">Policy</span>
@@ -248,22 +341,37 @@ require_once __DIR__ . '/../includes/header.php';
             </li>
         </ul>
 
+        <!-- Points Insufficient Warning in Modal -->
+        <div id="modalPointsWarning" class="alert alert-error mb-md" style="display:none;" role="alert">
+            <span class="alert-icon material-symbols-outlined" aria-hidden="true">warning</span>
+            <div>
+                <strong>Insufficient points for this duration!</strong>
+                <p style="font-size:12px; margin-top:2px;">
+                    You need <span id="modalWarningCost">10</span> points, but you have <?= $user_points ?> points.
+                </p>
+                <a href="<?= BASE_URL ?>/public/payment.php?reason=insufficient_points&return_to=book-slot" class="btn btn-primary" style="margin-top:8px; padding:6px 12px; font-size:12px; display:inline-flex;">
+                    Top Up Points
+                </a>
+            </div>
+        </div>
+
         <div class="alert alert-warning" style="margin-bottom:var(--sp-md);">
             <span class="alert-icon material-symbols-outlined" aria-hidden="true">info</span>
             <span style="font-size:13px;">Check in within 15 minutes of your reservation time.</span>
         </div>
 
-        <form method="POST" action="">
-            <input type="hidden" id="inputSlotId"   name="slot_id"      value="">
-            <input type="hidden" id="inputSlotCode" name="slot_code_ref" value="">
-            <input type="hidden" name="booking_date" value="<?= htmlspecialchars($selected_date) ?>">
+        <form method="POST" action="" id="bookingForm">
+            <input type="hidden" id="inputSlotId"       name="slot_id"        value="">
+            <input type="hidden" id="inputSlotCode"     name="slot_code_ref"   value="">
+            <input type="hidden" id="inputDurationHours" name="duration_hours" value="1">
+            <input type="hidden" name="booking_date"    value="<?= htmlspecialchars($selected_date) ?>">
 
             <div class="modal-actions">
-                <button type="button" class="btn btn-outline"
+                <button type="button" class="btn btn-outline" id="modalCancelBtn"
                         onclick="document.getElementById('bookingModal').classList.remove('is-open');document.getElementById('bookingModal').setAttribute('aria-hidden','true');">
                     Cancel
                 </button>
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-primary" id="modalSubmitBtn">
                     Confirm Booking
                     <span class="material-symbols-outlined" style="font-size:18px;">check_circle</span>
                 </button>
