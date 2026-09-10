@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/auth.php';
 // Redirect authenticated users straight to the dashboard
 $user = current_user();
 if (!empty($user['id'])) {
-    header('Location: /parking-system/public/dashboard.php');
+    header('Location: ' . BASE_URL . '/public/dashboard.php');
     exit;
 }
 
@@ -51,11 +51,11 @@ require_once __DIR__ . '/../includes/header.php';
 <section class="hero-fullbleed-section" aria-labelledby="heroTitle">
     <!-- Background Canvas Layers (Dual Light & Dark Assets with Edge Blur & Top Fade) -->
     <div class="hero-fullbleed-bg-wrapper" aria-hidden="true">
-        <img src="/parking-system/assets/images/hero-bg-isometric-light.jpg?v=<?= time() ?>"
+        <img src="<?= BASE_URL ?>/assets/images/hero-bg-isometric-light.jpg?v=<?= time() ?>"
              alt=""
              class="hero-fullbleed-bg-img hero-bg-light-only"
              loading="eager" width="1920" height="1080">
-        <img src="/parking-system/assets/images/hero-bg-isometric-dark.jpg?v=<?= time() ?>"
+        <img src="<?= BASE_URL ?>/assets/images/hero-bg-isometric-dark.jpg?v=<?= time() ?>"
              alt=""
              class="hero-fullbleed-bg-img hero-bg-dark-only"
              loading="eager" width="1920" height="1080">
@@ -75,7 +75,7 @@ require_once __DIR__ . '/../includes/header.php';
             Reserve a guaranteed campus spot in minutes, cruise straight to your bay, and arrive on time with CampusPark.
         </p>
 
-        <a href="/parking-system/public/signup.php" class="btn-pill-isometric">
+        <a href="<?= BASE_URL ?>/public/signup.php" class="btn-pill-isometric">
             <span>Reserve a Spot</span>
         </a>
     </div>
@@ -87,7 +87,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="hero-trip-time">4 <span>min</span></div>
 
         <div class="hero-trip-car-box">
-            <img src="/parking-system/assets/images/hero-car-card.jpg?v=<?= time() ?>" alt="Electric vehicle" class="hero-trip-car-img">
+            <img src="<?= BASE_URL ?>/assets/images/hero-car-card.jpg?v=<?= time() ?>" alt="Electric vehicle" class="hero-trip-car-img">
         </div>
 
         <div class="hero-trip-timeline">

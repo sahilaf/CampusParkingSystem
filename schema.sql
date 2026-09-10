@@ -15,6 +15,8 @@ CREATE TABLE users (
     role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
     late_departure_count INT NOT NULL DEFAULT 0,
     booking_locked_until DATE DEFAULT NULL, -- the "unique twist": set when late_departure_count hits 3
+    reward_points INT NOT NULL DEFAULT 100,
+    package_tier VARCHAR(50) DEFAULT 'Starter',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -33,12 +35,26 @@ CREATE TABLE bookings (
     user_id INT NOT NULL,
     slot_id INT NOT NULL,
     booking_date DATE NOT NULL,
+    duration_hours INT NOT NULL DEFAULT 1,
+    points_cost INT NOT NULL DEFAULT 10,
     check_in_time DATETIME DEFAULT NULL,
     check_out_time DATETIME DEFAULT NULL,
     status ENUM('booked', 'checked_in', 'completed', 'cancelled') NOT NULL DEFAULT 'booked',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (slot_id) REFERENCES parking_slots(id) ON DELETE CASCADE
+);
+
+-- 4. Point transactions and demo payment log
+CREATE TABLE point_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    type ENUM('signup_bonus', 'booking_deduction', 'package_purchase') NOT NULL,
+    points INT NOT NULL,
+    package_name VARCHAR(50) DEFAULT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Seed a few test slots so Update 1 has something to book

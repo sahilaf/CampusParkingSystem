@@ -15,8 +15,8 @@ $current_file = basename($_SERVER['PHP_SELF']);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($page_title) ?> — CampusPark</title>
     <meta name="description" content="Reserve campus parking in seconds. CampusPark lets students and staff book dedicated spots across all university zones.">
-    <link rel="icon" type="image/jpeg" href="/parking-system/assets/images/logo.jpg">
-    <link rel="apple-touch-icon" href="/parking-system/assets/images/logo.jpg">
+    <link rel="icon" type="image/jpeg" href="<?= BASE_URL ?>/assets/images/logo.jpg">
+    <link rel="apple-touch-icon" href="<?= BASE_URL ?>/assets/images/logo.jpg">
 
     <!-- Google Fonts: Plus Jakarta Sans (Display/Hero) & Geist -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -42,8 +42,8 @@ $current_file = basename($_SERVER['PHP_SELF']);
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    <!-- Primary stylesheet — with cache busting -->
-    <link rel="stylesheet" href="/parking-system/assets/css/style.css?v=<?= file_exists($_SERVER['DOCUMENT_ROOT'] . '/parking-system/assets/css/style.css') ? filemtime($_SERVER['DOCUMENT_ROOT'] . '/parking-system/assets/css/style.css') : time() ?>">
+    <!-- Primary stylesheet — with dynamic base URL & cache busting -->
+    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=<?= file_exists(__DIR__ . '/../assets/css/style.css') ? filemtime(__DIR__ . '/../assets/css/style.css') : time() ?>">
 
     <!-- Tailwind CDN with same config as landing.html —
          used as fallback for trivial layout utilities (flex, gap-*, grid-cols-*, etc.)
@@ -135,8 +135,8 @@ $current_file = basename($_SERVER['PHP_SELF']);
      ========================================================= -->
 <header class="navbar" role="banner">
   <div class="navbar-inner">
-    <a href="/parking-system/public/index.php" class="navbar-brand" aria-label="CampusPark home">
-        <img src="/parking-system/assets/images/logo.jpg" alt="CampusPark Logo" class="navbar-brand-logo" width="32" height="32">
+    <a href="<?= BASE_URL ?>/public/index.php" class="navbar-brand" aria-label="CampusPark home">
+        <img src="<?= BASE_URL ?>/assets/images/logo.jpg" alt="CampusPark Logo" class="navbar-brand-logo" width="32" height="32">
         CampusPark
     </a>
 
@@ -145,27 +145,35 @@ $current_file = basename($_SERVER['PHP_SELF']);
         <button aria-label="Toggle Theme" class="theme-toggle-btn material-symbols-outlined nav-link" style="cursor:pointer; background:none; border:none; padding:6px 10px;">
             dark_mode
         </button>
-        <?php if ($is_authed): ?>
-            <a href="/parking-system/public/dashboard.php"
+        <?php if ($is_authed): 
+            $user_pts = (int) ($user['reward_points'] ?? ($_SESSION['reward_points'] ?? 0));
+        ?>
+            <a href="<?= BASE_URL ?>/public/dashboard.php"
                class="nav-link <?= $current_file === 'dashboard.php' ? 'nav-link--active' : '' ?>">
                 Dashboard
             </a>
-            <a href="/parking-system/public/book-slot.php"
+            <a href="<?= BASE_URL ?>/public/book-slot.php"
                class="nav-link <?= $current_file === 'book-slot.php' ? 'nav-link--active' : '' ?>">
                 Book a Slot
+            </a>
+            <a href="<?= BASE_URL ?>/public/payment.php"
+               class="nav-points-badge <?= $current_file === 'payment.php' ? 'nav-points-badge--active' : '' ?>"
+               title="Reward Points & Payment Packages">
+                <span class="material-symbols-outlined" style="font-size:16px;">toll</span>
+                <span><?= $user_pts ?> pts</span>
             </a>
             <span class="nav-link text-muted" style="cursor:default; font-size:13px;">
                 <?= htmlspecialchars($user['full_name'] ?? $user['name'] ?? '') ?>
             </span>
-            <a href="/parking-system/public/logout.php" class="nav-link nav-link--cta">
+            <a href="<?= BASE_URL ?>/public/logout.php" class="nav-link nav-link--cta">
                 Log Out
             </a>
         <?php else: ?>
-            <a href="/parking-system/public/login.php"
+            <a href="<?= BASE_URL ?>/public/login.php"
                class="nav-link nav-link--ghost <?= $current_file === 'login.php' ? 'nav-link--active' : '' ?>">
                 Log In
             </a>
-            <a href="/parking-system/public/signup.php"
+            <a href="<?= BASE_URL ?>/public/signup.php"
                class="nav-link nav-link--cta">
                 Sign Up Free
             </a>
@@ -185,27 +193,39 @@ $current_file = basename($_SERVER['PHP_SELF']);
         <span class="material-symbols-outlined">dark_mode</span>
         <span class="theme-toggle-label">Dark Mode</span>
     </button>
-    <?php if ($is_authed): ?>
-        <a href="/parking-system/public/dashboard.php"
+    <?php if ($is_authed): 
+        $user_pts = (int) ($user['reward_points'] ?? ($_SESSION['reward_points'] ?? 0));
+    ?>
+        <a href="<?= BASE_URL ?>/public/dashboard.php"
            class="mobile-nav-link <?= $current_file === 'dashboard.php' ? 'mobile-nav-link--active' : '' ?>">
             Dashboard
         </a>
-        <a href="/parking-system/public/book-slot.php"
+        <a href="<?= BASE_URL ?>/public/book-slot.php"
            class="mobile-nav-link <?= $current_file === 'book-slot.php' ? 'mobile-nav-link--active' : '' ?>">
             Book a Slot
+        </a>
+        <a href="<?= BASE_URL ?>/public/payment.php"
+           class="mobile-nav-link flex items-center justify-between <?= $current_file === 'payment.php' ? 'mobile-nav-link--active' : '' ?>">
+            <span class="flex items-center gap-2">
+                <span class="material-symbols-outlined" style="font-size:20px; color:var(--clr-secondary);">toll</span>
+                <span>Payment Packages</span>
+            </span>
+            <span class="badge" style="background:rgba(8,145,178,0.12); color:var(--clr-secondary); font-weight:700;">
+                <?= $user_pts ?> pts
+            </span>
         </a>
         <div class="mobile-nav-user">
             Logged in as <strong><?= htmlspecialchars($user['full_name'] ?? $user['name'] ?? '') ?></strong>
         </div>
-        <a href="/parking-system/public/logout.php" class="mobile-nav-link mobile-nav-link--cta">
+        <a href="<?= BASE_URL ?>/public/logout.php" class="mobile-nav-link mobile-nav-link--cta">
             Log Out
         </a>
     <?php else: ?>
-        <a href="/parking-system/public/login.php"
+        <a href="<?= BASE_URL ?>/public/login.php"
            class="mobile-nav-link <?= $current_file === 'login.php' ? 'mobile-nav-link--active' : '' ?>">
             Log In
         </a>
-        <a href="/parking-system/public/signup.php"
+        <a href="<?= BASE_URL ?>/public/signup.php"
            class="mobile-nav-link mobile-nav-link--cta">
             Sign Up Free
         </a>

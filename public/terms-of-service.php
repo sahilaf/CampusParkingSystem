@@ -219,7 +219,7 @@ require_once __DIR__ . '/../includes/header.php';
             </h2>
             <p style="color:var(--clr-text-muted, #475569); line-height:1.75;">
                 Your use of CampusPark is also governed by our
-                <a href="/parking-system/public/privacy-policy.php" style="color:var(--clr-primary, #0891B2); font-weight:600;">Privacy Policy</a>,
+                <a href="<?= BASE_URL ?>/public/privacy-policy.php" style="color:var(--clr-primary, #0891B2); font-weight:600;">Privacy Policy</a>,
                 which is incorporated into these Terms by reference. By using the service you consent to the
                 collection and use of your information as described therein.
             </p>
@@ -280,7 +280,7 @@ require_once __DIR__ . '/../includes/header.php';
 
     <!-- Back link -->
     <div class="mt-10">
-        <a href="/parking-system/public/index.php"
+        <a href="<?= BASE_URL ?>/public/index.php"
            style="display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:600; color:var(--clr-primary, #0891B2); text-decoration:none;">
             <span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span>
             Back to Home

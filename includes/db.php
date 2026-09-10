@@ -18,8 +18,44 @@ $pdo_options = [
 
 try {
     $pdo = new PDO($dsn, DB_USER, DB_PASS, $pdo_options);
+
+    // Auto-migration check: ensure reward points & payment schema columns exist
+    static $migrated = false;
+    if (!$migrated) {
+        $migrated = true;
+        try {
+            // Check if users table has reward_points
+            $colCheck = $pdo->query("SHOW COLUMNS FROM users LIKE 'reward_points'");
+            if ($colCheck && !$colCheck->fetch()) {
+                $pdo->exec("ALTER TABLE users ADD COLUMN reward_points INT NOT NULL DEFAULT 100 AFTER booking_locked_until");
+                $pdo->exec("ALTER TABLE users ADD COLUMN package_tier VARCHAR(50) DEFAULT 'Starter' AFTER reward_points");
+            }
+
+            // Check if bookings table has duration_hours
+            $colCheck2 = $pdo->query("SHOW COLUMNS FROM bookings LIKE 'duration_hours'");
+            if ($colCheck2 && !$colCheck2->fetch()) {
+                $pdo->exec("ALTER TABLE bookings ADD COLUMN duration_hours INT NOT NULL DEFAULT 1 AFTER booking_date");
+                $pdo->exec("ALTER TABLE bookings ADD COLUMN points_cost INT NOT NULL DEFAULT 10 AFTER duration_hours");
+            }
+
+            // Check if point_transactions table exists
+            $pdo->exec("CREATE TABLE IF NOT EXISTS point_transactions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                type ENUM('signup_bonus', 'booking_deduction', 'package_purchase') NOT NULL,
+                points INT NOT NULL,
+                package_name VARCHAR(50) DEFAULT NULL,
+                description VARCHAR(255) DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )");
+        } catch (Throwable $ignore) {
+            // Silently ignore if schema setup is already handled or tables not created yet
+        }
+    }
 } catch (PDOException $e) {
     // Surface a safe message; never expose the raw exception to the browser.
     http_response_code(500);
     exit('Database connection failed. Please try again later.');
 }
+
