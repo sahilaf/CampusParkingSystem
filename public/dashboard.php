@@ -8,9 +8,10 @@ $is_locked   = is_booking_locked();
 $user_points = refresh_user_points($pdo, $user['id']);
 $package_tier = $_SESSION['package_tier'] ?? 'Starter';
 
-// Fetch latest 10 bookings including duration & points cost
+// Fetch latest 10 bookings including duration, points cost, and check-in/out times
 $stmt = $pdo->prepare(
-    'SELECT b.id, b.booking_date, b.duration_hours, b.points_cost, b.status, s.slot_code, s.zone
+    'SELECT b.id, b.booking_date, b.duration_hours, b.points_cost, b.status,
+            b.check_in_time, b.check_out_time, s.slot_code, s.zone
        FROM bookings b
        JOIN parking_slots s ON s.id = b.slot_id
       WHERE b.user_id = ?
@@ -30,8 +31,84 @@ $stmt3 = $pdo->prepare("SELECT COUNT(*) FROM bookings WHERE user_id = ? AND stat
 $stmt3->execute([$user['id']]);
 $completed_count = (int) $stmt3->fetchColumn();
 
-$flash = $_SESSION['flash'] ?? '';
-unset($_SESSION['flash']);
+$flash       = $_SESSION['flash']       ?? '';
+$flash_error = $_SESSION['flash_error'] ?? '';
+unset($_SESSION['flash'], $_SESSION['flash_error']);
+
+$today = date('Y-m-d');
+
+// Sweep 1: silently cancel any 'booked' bookings from past dates.
+// These are ghost rows — the date passed without a check-in. No late-strike
+// is applied here because the penalty for today's no-shows is handled below.
+$pastStmt = $pdo->prepare(
+    "UPDATE bookings SET status = 'cancelled'
+      WHERE user_id = ? AND status = 'booked' AND booking_date < CURDATE()"
+);
+$pastStmt->execute([$user['id']]);
+$past_cancelled = $pastStmt->rowCount();
+
+// Sweep 2: cancel today's 'booked' slots whose 15-minute check-in window has expired,
+// and apply the late-departure penalty for each no-show.
+$expStmt = $pdo->prepare(
+    "SELECT COUNT(*) FROM bookings
+      WHERE user_id = ? AND status = 'booked' AND booking_date = CURDATE()
+        AND created_at <= NOW() - INTERVAL 15 MINUTE"
+);
+$expStmt->execute([$user['id']]);
+$expired_count = (int) $expStmt->fetchColumn();
+
+if ($expired_count > 0) {
+    // Cancel the expired bookings.
+    $cancelStmt = $pdo->prepare(
+        "UPDATE bookings SET status = 'cancelled'
+          WHERE user_id = ? AND status = 'booked' AND booking_date = CURDATE()
+            AND created_at <= NOW() - INTERVAL 15 MINUTE"
+    );
+    $cancelStmt->execute([$user['id']]);
+
+    // Penalise: one late-strike per expired booking.
+    $incStmt = $pdo->prepare(
+        'UPDATE users SET late_departure_count = late_departure_count + ? WHERE id = ?'
+    );
+    $incStmt->execute([$expired_count, $user['id']]);
+
+    // Re-fetch authoritative late count after update.
+    $cntStmt = $pdo->prepare('SELECT late_departure_count FROM users WHERE id = ?');
+    $cntStmt->execute([$user['id']]);
+    $new_late = (int) $cntStmt->fetchColumn();
+    $_SESSION['late_count'] = $new_late;
+
+    // Apply booking lock if the new count is a multiple of 3.
+    if ($new_late % 3 === 0) {
+        $tomorrow = date('Y-m-d', strtotime('+1 day'));
+        $lockStmt = $pdo->prepare('UPDATE users SET booking_locked_until = ? WHERE id = ?');
+        $lockStmt->execute([$tomorrow, $user['id']]);
+        $_SESSION['booking_locked_until'] = $tomorrow;
+        $is_locked = true;
+    }
+
+    // Surface a warning banner (only if there's no other flash message already queued).
+    if ($flash_error === '') {
+        $noun = $expired_count === 1 ? 'booking was' : 'bookings were';
+        $flash_error = "{$expired_count} {$noun} auto-cancelled — the 15-minute check-in window expired without a check-in.";
+    }
+}
+
+// Re-fetch the bookings list whenever either sweep made changes,
+// so the table reflects the correct badge state on this very load.
+if ($past_cancelled > 0 || $expired_count > 0) {
+    $stmt = $pdo->prepare(
+        'SELECT b.id, b.booking_date, b.duration_hours, b.points_cost, b.status,
+                b.check_in_time, b.check_out_time, s.slot_code, s.zone
+           FROM bookings b
+           JOIN parking_slots s ON s.id = b.slot_id
+          WHERE b.user_id = ?
+          ORDER BY b.created_at DESC
+          LIMIT 10'
+    );
+    $stmt->execute([$user['id']]);
+    $bookings = $stmt->fetchAll();
+}
 
 function booking_badge_class(string $status): string {
     return match($status) {
@@ -75,6 +152,14 @@ require_once __DIR__ . '/../includes/header.php';
                 Recharge Points
             </a>
         </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Flash error -->
+    <?php if ($flash_error !== ''): ?>
+    <div class="alert alert-error" role="alert">
+        <span class="alert-icon material-symbols-outlined" aria-hidden="true">error</span>
+        <?= htmlspecialchars($flash_error) ?>
     </div>
     <?php endif; ?>
 
@@ -163,12 +248,16 @@ require_once __DIR__ . '/../includes/header.php';
                             <th scope="col">Date</th>
                             <th scope="col">Duration & Cost</th>
                             <th scope="col">Status</th>
+                            <th scope="col">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($bookings as $b): 
+                        <?php foreach ($bookings as $b):
                             $duration = (int) ($b['duration_hours'] ?? 1);
                             $pts      = (int) ($b['points_cost'] ?? ($duration * 10));
+                            // Determine which action button to show, if any.
+                            $show_checkin  = ($b['status'] === 'booked'      && $b['booking_date'] === $today);
+                            $show_checkout = ($b['status'] === 'checked_in');
                         ?>
                         <tr>
                             <td class="font-semi text-muted">
@@ -186,6 +275,29 @@ require_once __DIR__ . '/../includes/header.php';
                                     <?= htmlspecialchars(ucfirst(str_replace('_', ' ', $b['status']))) ?>
                                 </span>
                             </td>
+                            <td>
+                                <?php if ($show_checkin): ?>
+                                <form method="POST" action="<?= BASE_URL ?>/includes/checkin.php">
+                                    <input type="hidden" name="booking_id" value="<?= (int)$b['id'] ?>">
+                                    <button type="submit" class="btn btn-checkin"
+                                            aria-label="Check in for booking #CP-<?= str_pad((string)$b['id'], 4, '0', STR_PAD_LEFT) ?>">
+                                        <span class="material-symbols-outlined" style="font-size:15px;">login</span>
+                                        Check In
+                                    </button>
+                                </form>
+                                <?php elseif ($show_checkout): ?>
+                                <form method="POST" action="<?= BASE_URL ?>/includes/checkout.php">
+                                    <input type="hidden" name="booking_id" value="<?= (int)$b['id'] ?>">
+                                    <button type="submit" class="btn btn-checkout"
+                                            aria-label="Check out for booking #CP-<?= str_pad((string)$b['id'], 4, '0', STR_PAD_LEFT) ?>">
+                                        <span class="material-symbols-outlined" style="font-size:15px;">logout</span>
+                                        Check Out
+                                    </button>
+                                </form>
+                                <?php else: ?>
+                                <span class="text-muted" style="font-size:12px;">—</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -196,9 +308,5 @@ require_once __DIR__ . '/../includes/header.php';
     </section>
 
 </div><!-- /max-w-7xl -->
-
-<?php
-// TODO (later update): check-in/check-out interface, notifications, PDF export, vehicles.
-?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

@@ -2685,5 +2685,86 @@ html.dark .pricing-divider {
     background: rgba(255, 255, 255, 0.08);
 }
 
+/* --------------------------------------------------------------------------
+   25. Check-in / Check-out action buttons (dashboard table Actions column)
+       Uses only existing design tokens — no new colors introduced.
+   -------------------------------------------------------------------------- */
 
+/* Check-in: success green pill — signals a positive "enter" action */
+.btn-checkin {
+    background: var(--clr-success);
+    color: #FFFFFF !important;
+    border: none;
+    border-radius: var(--r-full);
+    font-family: var(--ff);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-xs);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 150ms, transform 150ms, box-shadow 150ms;
+    box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+    text-decoration: none;
+}
+.btn-checkin:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(5, 150, 105, 0.35);
+    color: #FFFFFF !important;
+    text-decoration: none;
+}
+.btn-checkin:active { transform: translateY(0); }
+.btn-checkin:focus-visible { outline: 2px solid var(--clr-success); outline-offset: 2px; }
+
+/* Check-out: secondary (cyan) pill — signals a neutral "exit" action */
+.btn-checkout {
+    background: var(--clr-secondary);
+    color: #FFFFFF !important;
+    border: none;
+    border-radius: var(--r-full);
+    font-family: var(--ff);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-xs);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 150ms, transform 150ms, box-shadow 150ms;
+    box-shadow: 0 2px 6px rgba(8, 145, 178, 0.25);
+    text-decoration: none;
+}
+.btn-checkout:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(8, 145, 178, 0.35);
+    color: #FFFFFF !important;
+    text-decoration: none;
+}
+.btn-checkout:active { transform: translateY(0); }
+.btn-checkout:focus-visible { outline: 2px solid var(--clr-secondary); outline-offset: 2px; }
+
+/* Dark-mode overrides — tokens already flip in html.dark, but we tighten
+   the text color so both buttons remain readable on the dark surface. */
+html.dark .btn-checkin {
+    color: #0F172A !important;
+    box-shadow: 0 2px 8px rgba(52, 211, 153, 0.3);
+}
+html.dark .btn-checkin:hover {
+    box-shadow: 0 4px 14px rgba(52, 211, 153, 0.45);
+    color: #0F172A !important;
+}
+
+html.dark .btn-checkout {
+    color: #0F172A !important;
+    box-shadow: 0 2px 8px rgba(34, 211, 238, 0.3);
+}
+html.dark .btn-checkout:hover {
+    box-shadow: 0 4px 14px rgba(34, 211, 238, 0.45);
+    color: #0F172A !important;
+}
 

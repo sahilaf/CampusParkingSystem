@@ -381,8 +381,4 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<?php
-// TODO (later update): check-in / check-out actions from this page.
-?>
-
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

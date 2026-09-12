@@ -9,7 +9,8 @@ if (session_status() === PHP_SESSION_NONE) {
 // Dynamically compute base web URL to work in any folder (e.g. /parking-system or /Web Programming/CampusParkingSystem)
 if (!defined('BASE_URL')) {
     $script_dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
-    if (basename($script_dir) === 'public') {
+    // Strip the /public or /includes leaf so BASE_URL always points to the project root.
+    if (basename($script_dir) === 'public' || basename($script_dir) === 'includes') {
         $script_dir = str_replace('\\', '/', dirname($script_dir));
     }
     if ($script_dir === '/' || $script_dir === '\\' || $script_dir === '.') {
